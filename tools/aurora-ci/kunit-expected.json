@@ -61,13 +61,6 @@
     "count": 3,
     "reason": "Same uninitialised dimensions_wq flush in dcp_comp_unbind(), once per unbind in the case."
    }
-  ],
-  "apple-display-parser.parser_attribute_deferred": [
-   {
-    "site": "kernel/workqueue.c:__queue_work",
-    "count": 1,
-    "reason": "WARN_ON(!list_empty(&work->entry)): dcp_attributes_replace() schedules dcp->connector->hotplug_wq, but the test allocates the connector with kunit_kzalloc() and never calls INIT_WORK() on it, so the work is refused. The test still passes."
-   }
   ]
  }
 }
