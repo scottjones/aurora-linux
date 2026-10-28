@@ -274,7 +274,6 @@ impl platform::Driver for AsahiPlatformDriver {
         info: Option<&'bound Self::IdInfo>,
     ) -> impl PinInit<Self::Data<'bound>, Error> + 'bound {
         debug::update_debug_flags();
-        crate::memacct::LEDGER.configure();
 
         // SAFETY: Takes no arguments, process context. Lets the T6001 AGX vote run again after an earlier unbind released it; a no-op everywhere else.
         unsafe { bindings::apple_pmp_agx_activity_resume() };
@@ -482,6 +481,8 @@ impl AsahiPlatformDriver {
         res: regs::G17Resources,
         cfg: &'static g17::Config,
     ) -> Result<AsahiPlatformDriverData<'bound>> {
+        // The GPU memory limits and RSS attribution apply only to G17 for now.
+        crate::memacct::LEDGER.configure();
         // SAFETY: The GPU performs DMA through a UAT whose output width is part of the SoC config.
         unsafe { pdev.dma_set_mask_and_coherent(DmaMask::try_new(cfg.uat_oas)?)? };
         let resources = regs::Resources::new(pdev)?;
