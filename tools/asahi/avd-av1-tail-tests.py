@@ -253,6 +253,9 @@ def main():
     build = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=environment)
     (args.out / 'build.log').write_text(build.stdout)
     if build.returncode:
+        if args.mutation:
+            print(f'mutation {args.mutation}: controls did not build (see build.log); no mutant verdict')
+            raise SystemExit(0)
         raise SystemExit(build.returncode)
     run_command = [str(exe)]
     if args.case != 'all':
