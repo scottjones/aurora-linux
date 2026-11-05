@@ -2082,6 +2082,16 @@
     "{output}"
    ],
    "note": "Build only the host Kconfig tool in an isolated output directory; check all built-in/module dependency combinations."
+  },
+  {
+   "name": "tools/asahi/g15-j514c-firmware-tests.py",
+   "group": "tools",
+   "argv": [
+    "python3",
+    "tools/asahi/g15-j514c-firmware-tests.py"
+   ],
+   "rust": "1.93.1",
+   "note": "Production full firmware lookup against T6031 rows; exact J514C identity and other-board refusal. Public synthetic inputs only; no firmware images."
   }
  ],
  "helpers": {
