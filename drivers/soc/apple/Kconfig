@@ -272,7 +272,10 @@ config APPLE_DISPLAY_GATE_KUNIT_TEST
 	  default only on J514C and J516C, otherwise only with
 	  apple_t6031_display.enable=1, off with apple_t6031_display.enable=0,
 	  only with the boot loader's handoff marker and this Mac's PMP values,
-	  and with nothing changed when a check fails. On T6030: on by default, as
+	  and with nothing changed when a check fails. On T6034 (the T6031
+	  tree with T6034 compatibles): on by default only on J514M, off with
+	  apple_t6034_display.enable=0, never on J516M, and only with the
+	  handoff marker. On T6030: on by default, as
 	  before, whatever the T6031 option says. On T8122: on by default,
 	  and nothing changed when the handoff or the device tree's own PMP
 	  topology does not check out.

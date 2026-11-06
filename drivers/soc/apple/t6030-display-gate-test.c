@@ -12,6 +12,10 @@
  *    otherwise only with apple_t6031_display.enable=1, never with
  *    apple_t6031_display.enable=0; always with the full handoff, and nothing
  *    changed when a check fails.
+ *  - T6034 (the T6031 tree, its display and PMP nodes given the T6034
+ *    compatibles and marker by each case): on by default only on the J514M,
+ *    never with apple_t6034_display.enable=0, never on the J516M, and
+ *    always with the full handoff.
  *  - T8122 (t8122-gate-test.dtso): on by default, with the full handoff,
  *    and nothing changed when a check of the handoff or of the reused PMP
  *    topology fails.
@@ -130,6 +134,36 @@ static const struct gt_soc gt_t6030 __initconst = {
 	.pmp_uuid = "2F4EB4C4-001B-3ACF-A9A0-68D8E42FC3A7",
 };
 
+/* The T6031 tree, which each T6034 case turns into a T6034 one (gt_as_t6034()). */
+static const struct gt_soc gt_t6034 __initconst = {
+	.soc = &gate_t6034,
+	.fixture = __dtbo_t6031_gate_test_begin,
+	.fixture_end = __dtbo_t6031_gate_test_end,
+	.nodes = { "/soc/dcp@386c00000", "/soc/display-subsystem", "/soc/mailbox@386c08000",
+		   "/soc/iommu@38530c000", "/soc/iommu@385304000" },
+	.dcp = "/soc/dcp@386c00000",
+	.display = "/soc/display-subsystem",
+	.values = "/chosen/asahi,t6034-pmp",
+	.aic = "/soc/interrupt-controller@292400000",
+	.ps = {
+		[PMP_PS_DISP_SYS] = "/soc/power-management@292280000/power-controller@200",
+		[PMP_PS_DISP_FE] = "/soc/power-management@292280000/power-controller@298",
+		[PMP_PS_DISP_CPU] = "/soc/power-management@292280000/power-controller@2a0",
+		[PMP_PS_PMP] = "/soc/power-management@292800000/power-controller@550",
+		[PMP_PS_PMS_SRAM] = "/soc/power-management@292800000/power-controller@560",
+	},
+	.report_compat = "apple,t6034-pmp-v2-report",
+	.disp_entry = "report@10",
+	.pmp_compat = "apple,t6034-pmp-v2",
+	.pmp_dart = "iommu@290300000",
+	.pmp_mbox = "mbox@290c08000",
+	.pmp_uuid = "07FF4C5B-CB2E-3DE6-95FF-3B107D19B7AB",
+	.report = "/soc/pmp_report@2903c0000",
+	.pmp = "/soc/pmp@290700000",
+	.disp = "/soc/pmp_report@2903c0000/report@10",
+	.ans = "/soc/pmp_report@2903c0000/report@21",
+};
+
 static int gt_fixture_t6031 __initdata = -1;
 static int gt_fixture_t6030 __initdata = -1;
 static int gt_fixture_t8122 __initdata = -1;
@@ -144,8 +178,9 @@ static int gt_live_soc __initdata = -1;
 struct gate_test {
 	const struct gt_soc *s;
 	struct of_changeset cs;	/* this case's own edits to the test tree */
-	bool requested, t6031_requested;
-	int t6031_switch;
+	bool requested, t6031_requested, t6034_requested;
+	int t6031_switch, t6034_switch;
+	const char *root_soc;		/* the root's SoC compatible, with default_board */
 	const char *default_board;
 };
 
@@ -375,6 +410,14 @@ static int __init gt_suite_init_t6031(struct kunit_suite *suite)
 	return gt_apply_fixture(&gt_t6031, &gt_fixture_t6031);
 }
 
+/* The T6034 cases use the T6031 tree; the T6031 suite has usually applied it. */
+static int __init gt_suite_init_t6034(struct kunit_suite *suite)
+{
+	if (gt_fixture_t6031 >= 0)
+		return 0;
+	return gt_apply_fixture(&gt_t6031, &gt_fixture_t6031);
+}
+
 static int __init gt_suite_init_t6030(struct kunit_suite *suite)
 {
 	return gt_apply_fixture(&gt_t6030, &gt_fixture_t6030);
@@ -392,7 +435,7 @@ static bool __init gt_root_is_compatible(const char *compat)
 	struct gate_test *t = test->priv;
 
 	return t->default_board &&
-	       (!strcmp(compat, "apple,t6031") || !strcmp(compat, t->default_board));
+	       (!strcmp(compat, t->root_soc) || !strcmp(compat, t->default_board));
 }
 
 static int __init gt_init(struct kunit *test, const struct gt_soc *s)
@@ -407,6 +450,9 @@ static int __init gt_init(struct kunit *test, const struct gt_soc *s)
 	t->requested = gate_requested;
 	t->t6031_requested = gate_t6031_requested;
 	t->t6031_switch = gate_t6031_switch;
+	t->t6034_requested = gate_t6034_requested;
+	t->t6034_switch = gate_t6034_switch;
+	t->root_soc = s->soc->machine;
 	of_changeset_init(&t->cs);
 	gate_soc = s->soc;
 	gate_pmp_values = NULL;
@@ -415,6 +461,8 @@ static int __init gt_init(struct kunit *test, const struct gt_soc *s)
 	gate_requested = true;
 	gate_t6031_requested = false;
 	gate_t6031_switch = -1;
+	gate_t6034_requested = false;
+	gate_t6034_switch = -1;
 	if (gt_live_soc)
 		kunit_skip(test, "the booted device tree has its own /soc");
 	kunit_activate_static_stub(test, gate_t6031_is_compatible, gt_root_is_compatible);
@@ -424,6 +472,11 @@ static int __init gt_init(struct kunit *test, const struct gt_soc *s)
 static int __init gt_init_t6031(struct kunit *test)
 {
 	return gt_init(test, &gt_t6031);
+}
+
+static int __init gt_init_t6034(struct kunit *test)
+{
+	return gt_init(test, &gt_t6034);
 }
 
 static int __init gt_init_t6030(struct kunit *test)
@@ -462,6 +515,8 @@ static void __init gt_exit(struct kunit *test)
 	gate_requested = t->requested;
 	gate_t6031_requested = t->t6031_requested;
 	gate_t6031_switch = t->t6031_switch;
+	gate_t6034_requested = t->t6034_requested;
+	gate_t6034_switch = t->t6034_switch;
 	gate_soc = NULL;
 }
 
@@ -941,6 +996,131 @@ static struct kunit_suite gate_t6031_suite __refdata = {
 	.test_cases = gate_t6031_cases,
 };
 
+/* T6034 */
+
+/* The T6031 tree as a T6034 one: its compatibles and handoff marker. */
+static void __init gt_as_t6034(struct kunit *test, const char *board)
+{
+	struct gate_test *t = test->priv;
+	const struct gt_soc *s = t->s;
+
+	t->default_board = board;
+	gt_set_string(test, s->dcp, "compatible", "apple,t6034-dcp");
+	gt_set_string(test, s->display, "compatible", "apple,t6034-display-subsystem");
+	gt_set_string(test, s->report, "compatible", "apple,t6034-pmp-v2-report");
+	gt_set_string(test, s->pmp, "compatible", "apple,t6034-pmp-v2");
+	gt_add_u32(test, s->dcp, "apple,t6034-handoff", 1);
+	gt_add_u32(test, "/soc/dcp@386c00000/piodma", "apple,t6034-handoff", 1);
+	gt_add_u32(test, s->display, "apple,t6034-handoff", 1);
+}
+
+/* Its own switch: the T6031 one does not change it, nor it the T6031 one. */
+static void __init gate_t6034_param(struct kunit *test)
+{
+	struct gate_test *t = test->priv;
+
+	KUNIT_EXPECT_EQ(test, t->t6034_switch, -1);
+	KUNIT_EXPECT_FALSE(test, t->t6034_requested);
+	KUNIT_EXPECT_EQ(test, gate_setup_t6034("0"), 0);
+	KUNIT_EXPECT_EQ(test, gate_t6034_switch, 0);
+	KUNIT_EXPECT_EQ(test, gate_t6031_switch, -1);
+	KUNIT_EXPECT_EQ(test, gate_setup_t6034("1"), 0);
+	KUNIT_EXPECT_EQ(test, gate_t6034_switch, 1);
+	KUNIT_EXPECT_NE(test, gate_setup_t6034("maybe"), 0);
+	KUNIT_EXPECT_EQ(test, gate_t6034_switch, 1);
+	KUNIT_EXPECT_EQ(test, gate_setup_t6031("0"), 0);
+	KUNIT_EXPECT_EQ(test, gate_t6034_switch, 1);
+	KUNIT_EXPECT_EQ(test, gate_t6031_switch, 0);
+	KUNIT_EXPECT_TRUE(test, gate_requested);
+}
+
+/* Only the J514M on a T6034, whatever the switch says. */
+static void __init gate_t6034_resolution(struct kunit *test)
+{
+	struct gate_test *t = test->priv;
+
+	t->default_board = "apple,j514m";
+	KUNIT_EXPECT_TRUE(test, gate_t6034_default_board());
+	KUNIT_EXPECT_TRUE(test, gate_t6034_wanted(-1));
+	KUNIT_EXPECT_FALSE(test, gate_t6034_wanted(0));
+	KUNIT_EXPECT_TRUE(test, gate_t6034_wanted(1));
+	t->default_board = "apple,j516m";
+	KUNIT_EXPECT_FALSE(test, gate_t6034_default_board());
+	KUNIT_EXPECT_FALSE(test, gate_t6034_wanted(-1));
+	KUNIT_EXPECT_FALSE(test, gate_t6034_wanted(1));
+	t->default_board = "apple,j514m";
+	t->root_soc = "apple,t6031";
+	KUNIT_EXPECT_FALSE(test, gate_t6034_default_board());
+}
+
+/* On the J514M, the full handoff and no switch: enabled. */
+static void __init gate_t6034_default_board_on(struct kunit *test)
+{
+	gt_as_t6034(test, "apple,j514m");
+	gt_run(test);
+	KUNIT_EXPECT_TRUE(test, gate_t6034_requested);
+	gt_expect_enabled(test);
+}
+
+/* apple_t6034_display.enable=0 wins on the J514M. */
+static void __init gate_t6034_switched_off(struct kunit *test)
+{
+	gt_as_t6034(test, "apple,j514m");
+	KUNIT_ASSERT_EQ(test, gate_setup_t6034("0"), 0);
+	gt_run(test);
+	KUNIT_EXPECT_FALSE(test, gate_t6034_requested);
+	gt_expect_untouched(test);
+}
+
+/* The T6031 switch is not the T6034 one. */
+static void __init gate_t6034_t6031_switch(struct kunit *test)
+{
+	gt_as_t6034(test, "apple,j514m");
+	KUNIT_ASSERT_EQ(test, gate_setup_t6031("0"), 0);
+	gt_run(test);
+	KUNIT_EXPECT_TRUE(test, gate_t6034_requested);
+	gt_expect_enabled(test);
+}
+
+/* The default asks for the display; it does not stand in for the handoff. */
+static void __init gate_t6034_no_marker(struct kunit *test)
+{
+	gt_as_t6034(test, "apple,j514m");
+	gt_remove(test, gt_t6034.dcp, "apple,t6034-handoff");
+	gt_run(test);
+	KUNIT_EXPECT_TRUE(test, gate_t6034_requested);
+	gt_expect_untouched(test);
+}
+
+/* The J516M is refused, even with the full handoff and the switch at 1. */
+static void __init gate_t6034_j516m_refused(struct kunit *test)
+{
+	gt_as_t6034(test, "apple,j516m");
+	KUNIT_ASSERT_EQ(test, gate_setup_t6034("1"), 0);
+	gt_run(test);
+	KUNIT_EXPECT_FALSE(test, gate_t6034_requested);
+	gt_expect_untouched(test);
+}
+
+static struct kunit_case gate_t6034_cases[] __refdata = {
+	KUNIT_CASE(gate_t6034_param),
+	KUNIT_CASE(gate_t6034_resolution),
+	KUNIT_CASE(gate_t6034_default_board_on),
+	KUNIT_CASE(gate_t6034_switched_off),
+	KUNIT_CASE(gate_t6034_t6031_switch),
+	KUNIT_CASE(gate_t6034_no_marker),
+	KUNIT_CASE(gate_t6034_j516m_refused),
+	{}
+};
+
+static struct kunit_suite gate_t6034_suite __refdata = {
+	.name = "apple-display-gate-t6034",
+	.suite_init = gt_suite_init_t6034,
+	.init = gt_init_t6034,
+	.exit = gt_exit,
+	.test_cases = gate_t6034_cases,
+};
+
 static struct kunit_case gate_t6030_cases[] __refdata = {
 	KUNIT_CASE(gate_t6030_default_on),
 	KUNIT_CASE(gate_t6030_escape),
@@ -988,4 +1168,5 @@ static struct kunit_suite gate_t8122_suite __refdata = {
 };
 
 /* T6030 first: the T6031 and T8122 trees describe a PMP, which it refuses. */
-kunit_test_init_section_suites(&gate_t6030_suite, &gate_t6031_suite, &gate_t8122_suite);
+kunit_test_init_section_suites(&gate_t6030_suite, &gate_t6031_suite, &gate_t6034_suite,
+			       &gate_t8122_suite);

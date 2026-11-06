@@ -187,10 +187,11 @@ static bool __init gate_t6031_wanted(int sw, bool default_board)
 static int gate_t6034_switch __initdata = -1;
 static bool gate_t6034_requested __initdata;
 
+/* The root identity goes through the KUnit stub point, as on T6031. */
 static bool __init gate_t6034_default_board(void)
 {
-	return of_machine_is_compatible("apple,t6034") &&
-	       of_machine_is_compatible("apple,j514m");
+	return gate_t6031_is_compatible("apple,t6034") &&
+	       gate_t6031_is_compatible("apple,j514m");
 }
 
 static bool __init gate_t6034_wanted(int sw)

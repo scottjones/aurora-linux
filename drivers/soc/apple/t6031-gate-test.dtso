@@ -24,6 +24,14 @@
 					apple,tunable-uuid = "07FF4C5B-CB2E-3DE6-95FF-3B107D19B7AB";
 					apple,tunable-test = <0x1 0x2>;
 				};
+
+				/* The same values where the T6034 gate reads them */
+				asahi,t6034-pmp {
+					apple,board-id = <0x1234>;
+					apple,dram-vendor-id = <0x5>;
+					apple,tunable-uuid = "07FF4C5B-CB2E-3DE6-95FF-3B107D19B7AB";
+					apple,tunable-test = <0x1 0x2>;
+				};
 			};
 
 			soc {

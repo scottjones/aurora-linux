@@ -31,7 +31,8 @@ static bool dcp_is(const void *ctx,const char *c) { return dcp && !strcmp(dcp,c)
 types=header[header.index('struct dcp_v14_board {'):header.index('#endif')]
 defines='\n'.join(l for l in driver.splitlines() if l.startswith('#define DCP_V14_') and 'FIRMWARE_UUID' in l)
 records=driver[driver.index('static const struct dcp_v14_board dcp_v14_board_t6030'):driver.index('struct dcp_v14_property {')]
-functions='\n'.join([item(gate,'static bool __init gate_t6031_wanted('),
+functions='\n'.join([item(gate,'static bool __init gate_t6031_is_compatible('),
+ item(gate,'static bool __init gate_t6031_wanted('),
  item(gate,'static bool __init gate_t6034_default_board('),item(gate,'static bool __init gate_t6034_wanted('),
  item(driver,'const struct dcp_v14_board *dcp_v14_board_select('),item(driver,'bool dcp_v14_board_admits(')])
 main = r'''
@@ -77,6 +78,56 @@ with tempfile.TemporaryDirectory(prefix='t6034-display-') as directory:
   print(name+': '+('pass' if name=='control' else 'caught'))
 assert 'gate_t6034_requested = gate_t6034_wanted(gate_t6034_switch);' in gate
 print('T6034 normal display defaults, owner disable, exact root pair and firmware identity: PASS')
+
+# The owner's apple_t6034_display.enable reaches the T6034 switch, not the
+# T6031 one, and the T6031 option does not reach it. gate_run() itself runs in
+# the apple-display-gate-t6034 KUnit suite.
+switches = r"""
+#include <assert.h>
+#include <stdbool.h>
+#include <string.h>
+#define __init
+#define __initdata
+#define early_param(name, fn)
+static int kstrtobool(const char *s, bool *res)
+{
+ if (!s) return -22;
+ if (!strcmp(s,"1")||!strcmp(s,"y")) { *res=true; return 0; }
+ if (!strcmp(s,"0")||!strcmp(s,"n")) { *res=false; return 0; }
+ return -22;
+}
+""" + '\n'.join([
+ 'static int gate_t6031_switch __initdata = -1;',
+ 'static int gate_t6034_switch __initdata = -1;',
+ item(gate,'static int __init gate_setup_t6031('),
+ item(gate,'static int __init gate_setup_t6034(')]) + r"""
+int main(void)
+{
+ assert(!gate_setup_t6034("0") && gate_t6034_switch==0 && gate_t6031_switch==-1);
+ assert(!gate_setup_t6034("1") && gate_t6034_switch==1 && gate_t6031_switch==-1);
+ assert(gate_setup_t6034("maybe") && gate_t6034_switch==1);
+ assert(!gate_setup_t6031("0") && gate_t6031_switch==0 && gate_t6034_switch==1);
+ return 0;
+}
+"""
+switch_mutants={
+ 'control':switches,
+ 't6034-sets-t6031-switch':switches.replace('gate_t6034_switch = on;','gate_t6031_switch = on;'),
+ 't6031-sets-t6034-switch':switches.replace('gate_t6031_switch = on;','gate_t6034_switch = on;'),
+}
+with tempfile.TemporaryDirectory(prefix='t6034-switch-') as directory:
+ for name,c in switch_mutants.items():
+  assert name=='control' or c!=switches,name
+  exe=Path(directory)/name
+  subprocess.run(['cc','-std=gnu11','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-x','c','-','-o',str(exe)],input=c,text=True,check=True)
+  result=subprocess.run([str(exe)],capture_output=True)
+  assert (result.returncode==0)==(name=='control'),(name,result.stderr)
+  print('switch '+name+': '+('pass' if name=='control' else 'caught'))
+kunit = (ROOT / 'drivers/soc/apple/t6030-display-gate-test.c').read_text()
+for case in ('gate_t6034_default_board_on','gate_t6034_switched_off','gate_t6034_no_marker','gate_t6034_j516m_refused'):
+ assert 'KUNIT_CASE(%s)' % case in kunit, case
+assert '&gate_t6034_suite' in kunit
+print('T6034 owner switch apart from T6031, and its gate_run() KUnit cases registered: PASS')
 
 # Compile the production report layout records and OF match table. Matching
 # T6034 through its generic T6020 fallback binds a report that never creates
