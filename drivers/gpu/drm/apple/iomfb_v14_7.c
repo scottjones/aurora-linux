@@ -248,6 +248,10 @@ static const struct dcp_v14_board dcp_v14_board_j514m = {
 	.handoff = "apple,t6034-handoff",
 	.promotion = true,
 	.log_bringup = true,
+	/* Same pinned DCP image as J516C: zero stamps cap this panel at 60 fps. */
+	.swap_timestamps = true,
+	/* J516C's 14.7 image uses the bounded nits block for the J514 panel too. */
+	.panel_nits = true,
 };
 
 static const struct dcp_v14_board *const dcp_v14_boards[] = {
@@ -1761,7 +1765,7 @@ static bool dcp_v14_panel_nits_admit(const struct dcp_v14_board *board,
 		(machine_is(ctx, "apple,j514s") || machine_is(ctx, "apple,j516s") ||
 		 machine_is(ctx, "apple,j516c") || machine_is(ctx, "apple,j613") ||
 		 machine_is(ctx, "apple,j504") || machine_is(ctx, "apple,j516m") ||
-		 machine_is(ctx, "apple,j615"));
+		 machine_is(ctx, "apple,j615") || machine_is(ctx, "apple,j514m"));
 }
 
 const char *iomfb_v14_7_board_name(const struct dcp_v14_board *board)
